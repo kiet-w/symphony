@@ -177,7 +177,7 @@ async function main() {
   // ponytail: Optional HTTP server for operator monitoring (status dashboard, live logs)
   Bun.serve({
     port: 4000,
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
       
       // Handle CORS for frontend Vite app
@@ -193,7 +193,13 @@ async function main() {
       if (url.pathname === "/api/status") {
         try {
           const activeLocks = db.query("SELECT * FROM locks").all();
-          return Response.json({ locks: activeLocks, logs: recentLogs }, {
+          let board = null;
+          try {
+            board = await getBoard();
+          } catch (e) {
+            addLog(`Error fetching board: ${e}`);
+          }
+          return Response.json({ locks: activeLocks, logs: recentLogs, board }, {
             headers: { "Access-Control-Allow-Origin": "*" }
           });
         } catch (e: any) {

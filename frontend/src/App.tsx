@@ -110,6 +110,9 @@ export default function App() {
           />
         </div>
 
+        {/* My Issues Kanban Board */}
+        <MyIssuesBoard />
+
         {/* Operator Dashboard */}
         <OperatorDashboard />
       </main>
@@ -205,6 +208,77 @@ function OperatorDashboard() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MyIssuesBoard() {
+  const [board, setBoard] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStatus = () => {
+      fetch("http://localhost:4000/api/status")
+        .then(res => res.json())
+        .then(res => setBoard(res.board))
+        .catch(() => setBoard(null));
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const columns = ["Todo", "In Progress", "In Review", "Done"];
+  
+  // Extract issues from GraphQL response
+  const issues = board?.repository?.projectV2?.items?.nodes?.map((node: any) => {
+    const statusNode = node.fieldValues.nodes.find((f: any) => f.field?.name === "Status");
+    const status = statusNode?.name || "Todo";
+    const content = node.content || {};
+    return {
+      id: content.id || node.id,
+      number: content.number,
+      title: content.title || "Unknown Issue",
+      status: status,
+      assignees: content.assignees?.nodes?.map((a: any) => a.login) || []
+    };
+  }) || [];
+
+  return (
+    <div className="mt-24">
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold tracking-tight">My Issues</h2>
+        <p className="text-slate-400 text-sm">Automated workflow board: Branch → In Progress, PR → In Review, Merge → Done.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {columns.map(col => (
+          <div key={col} className="bg-[#1E293B]/30 border border-slate-800 rounded-xl p-4 min-h-[300px]">
+            <h3 className="text-sm font-medium text-slate-300 mb-4 px-2 flex justify-between items-center">
+              {col}
+              <span className="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full">
+                {issues.filter((i: any) => i.status === col).length}
+              </span>
+            </h3>
+            <div className="space-y-3">
+              {issues.filter((i: any) => i.status === col).map((issue: any) => (
+                <div key={issue.id} className="bg-[#0F172A] border border-slate-700 p-3 rounded-lg hover:border-slate-600 transition-colors">
+                  <div className="text-xs font-mono text-[#22C55E] mb-1">TEAM-{issue.number || "???"}</div>
+                  <div className="text-sm text-slate-200 leading-snug">{issue.title}</div>
+                  {issue.assignees.length > 0 && (
+                    <div className="mt-3 flex gap-1">
+                      {issue.assignees.map((assignee: string) => (
+                        <div key={assignee} className="w-5 h-5 rounded-full bg-indigo-500/20 border border-indigo-500/50 flex items-center justify-center text-[10px] text-indigo-300" title={assignee}>
+                          {assignee.charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
