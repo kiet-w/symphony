@@ -1,9 +1,30 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Terminal, LockKey, Lightning, GithubLogo, ArrowRight, Monitor } from "@phosphor-icons/react";
+import { Terminal, LockKey, Lightning, GithubLogo, ArrowRight, Monitor, Copy, Check } from "@phosphor-icons/react";
 
 // ponytail: All-in-one minimal landing page. No unrequested router/components.
 export default function App() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(`{
+  "mcpServers": {
+    "symphony": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/symphony/src/server.ts"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_your_personal_access_token_here",
+        "GITHUB_OWNER": "kiet-w",
+        "GITHUB_REPO": "symphony",
+        "GITHUB_PROJECT_NUMBER": "1"
+      }
+    }
+  }
+}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-[100dvh] flex flex-col font-sans">
       {/* Navigation */}
@@ -63,7 +84,14 @@ export default function App() {
               <div className="w-3 h-3 rounded-full bg-rose-500/80" />
               <div className="w-3 h-3 rounded-full bg-amber-500/80" />
               <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              <span className="ml-2 text-xs font-mono text-slate-400">claude_desktop_config.json</span>
+              <span className="ml-2 text-xs font-mono text-slate-400 flex-1">claude_desktop_config.json</span>
+              <button 
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+              >
+                {copied ? <Check weight="bold" className="text-[#22C55E]" /> : <Copy />}
+                {copied ? <span className="text-[#22C55E]">Copied</span> : <span>Copy</span>}
+              </button>
             </div>
             <div className="p-6 overflow-x-auto">
               <pre className="font-mono text-sm leading-relaxed text-slate-300">
@@ -312,9 +340,12 @@ function QuickSetupGuide() {
           <div className="absolute top-0 left-0 w-1 h-full bg-[#22C55E]/50 group-hover:bg-[#22C55E] transition-colors" />
           <div className="text-[#22C55E] font-mono text-sm mb-2">Step 1</div>
           <h3 className="text-lg font-medium text-slate-200 mb-2">Copy Configuration</h3>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Copy the <code>claude_desktop_config.json</code> block from the top of this page. It contains the path to your Symphony server and GitHub variables.
+          <p className="text-slate-400 text-sm leading-relaxed mb-4">
+            Click the "Copy" button on the terminal graphic above to get your base configuration.
           </p>
+          <div className="text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 p-2 rounded">
+            ⚠️ Security: Never commit your real GitHub token to code. Replace "ghp_your_..." in the pasted file.
+          </div>
         </div>
         <div className="bg-[#1E293B]/30 border border-slate-800 p-6 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-colors">
           <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 group-hover:bg-amber-500 transition-colors" />
