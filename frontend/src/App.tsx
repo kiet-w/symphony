@@ -10,8 +10,8 @@ export default function App() {
     navigator.clipboard.writeText(`{
   "mcpServers": {
     "symphony": {
-      "command": "bun",
-      "args": ["run", "/absolute/path/to/symphony/src/server.ts"],
+      "command": "/home/baudui/.bun/bin/bun",
+      "args": ["run", "/home/baudui/Projects/project/symphony/src/server.ts"],
       "env": {
         "ENABLE_HTTP_SERVER": "true",
         "GITHUB_TOKEN": "ghp_your_personal_access_token_here",
@@ -100,8 +100,8 @@ export default function App() {
 {`{
   "mcpServers": {
     "symphony": {
-      "command": "bun",
-      "args": ["run", "src/server.ts"],
+      "command": "/home/baudui/.bun/bin/bun",
+      "args": ["run", "/home/baudui/Projects/project/symphony/src/server.ts"],
       "env": {
         "ENABLE_HTTP_SERVER": "true",
         "GITHUB_TOKEN": "ghp_...",
