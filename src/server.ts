@@ -9,6 +9,13 @@ import { getBoard, claimTicket, setStatus, postSignal } from "./github.ts";
 
 // Initialize SQLite for Locks (Bun built-in)
 const db = new Database("symphony_locks.sqlite");
+const recentLogs: string[] = [];
+function addLog(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}`;
+  console.error(line);
+  recentLogs.push(line);
+  if (recentLogs.length > 50) recentLogs.shift();
+}
 db.run(`
   CREATE TABLE IF NOT EXISTS locks (
     ticket_id TEXT PRIMARY KEY,
@@ -116,7 +123,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw error;
         }
         
-        console.error(`[Symphony] 🔒 Agent ${agentId} claimed ticket ${ticketId}`);
+        addLog(`🔒 Agent ${agentId} claimed ticket ${ticketId}`);
         server.sendLoggingMessage({ level: "info", data: "Board updated" });
         return {
           content: [{ type: "text", text: `Lock acquired & successfully claimed ticket ${ticketId} for agent ${agentId}.` }]
@@ -165,7 +172,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Symphony MCP Server (Bun + SQLite) running on stdio");
+  addLog("Symphony MCP Server (Bun + SQLite) running on stdio");
+  
+  // ponytail: Optional HTTP server for operator monitoring (status dashboard, live logs)
+  Bun.serve({
+    port: 4000,
+    fetch(req) {
+      const url = new URL(req.url);
+      
+      // Handle CORS for frontend Vite app
+      if (req.method === "OPTIONS") {
+        return new Response(null, {
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+          }
+        });
+      }
+
+      if (url.pathname === "/api/status") {
+        try {
+          const activeLocks = db.query("SELECT * FROM locks").all();
+          return Response.json({ locks: activeLocks, logs: recentLogs }, {
+            headers: { "Access-Control-Allow-Origin": "*" }
+          });
+        } catch (e: any) {
+          return Response.json({ error: e.message }, { status: 500 });
+        }
+      }
+      return new Response("Not found", { status: 404 });
+    }
+  });
+  addLog("HTTP Operator Dashboard API running on http://localhost:4000/api/status");
 }
 
 main().catch(console.error);

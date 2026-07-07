@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Terminal, LockKey, Lightning, GithubLogo, ArrowRight } from "@phosphor-icons/react";
+import { Terminal, LockKey, Lightning, GithubLogo, ArrowRight, Monitor } from "@phosphor-icons/react";
 
 // ponytail: All-in-one minimal landing page. No unrequested router/components.
 export default function App() {
@@ -108,6 +109,9 @@ export default function App() {
             delay={0.3}
           />
         </div>
+
+        {/* Operator Dashboard */}
+        <OperatorDashboard />
       </main>
     </div>
   );
@@ -130,5 +134,78 @@ function FeatureCard({ icon, title, desc, delay }: { icon: React.ReactNode, titl
         {desc}
       </p>
     </motion.div>
+  );
+}
+
+function OperatorDashboard() {
+  const [data, setData] = useState<{ locks: any[], logs: string[] } | null>(null);
+
+  useEffect(() => {
+    const fetchStatus = () => {
+      fetch("http://localhost:4000/api/status")
+        .then(res => res.json())
+        .then(res => setData(res))
+        .catch(() => setData(null));
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="mt-32 pb-24">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 rounded-full bg-[#1E293B] border border-slate-700 flex items-center justify-center">
+          <Monitor className="w-5 h-5 text-rose-400" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Operator Dashboard</h2>
+          <p className="text-slate-400 text-sm">Live monitoring from the backend API.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Active Locks */}
+        <div className="p-6 rounded-xl bg-[#1E293B]/30 border border-slate-800">
+          <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+            <LockKey className="w-4 h-4 text-[#22C55E]" />
+            Active SQLite Locks
+          </h3>
+          <div className="space-y-3">
+            {!data ? (
+              <div className="text-slate-500 text-sm italic">Connecting to backend...</div>
+            ) : data.locks.length === 0 ? (
+              <div className="text-slate-500 text-sm">No active locks.</div>
+            ) : (
+              data.locks.map((lock: any) => (
+                <div key={lock.ticket_id} className="flex justify-between items-center p-3 rounded bg-[#0F172A] border border-slate-800 text-sm">
+                  <span className="text-slate-300 font-mono">Ticket #{lock.ticket_id}</span>
+                  <span className="text-[#22C55E] px-2 py-0.5 rounded bg-[#22C55E]/10">Agent {lock.agent_id}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Live Logs */}
+        <div className="p-6 rounded-xl bg-[#1E293B]/30 border border-slate-800">
+          <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-amber-400" />
+            Live Logs
+          </h3>
+          <div className="bg-[#0F172A] border border-slate-800 rounded p-4 h-64 overflow-y-auto font-mono text-xs text-slate-400 space-y-1">
+            {!data ? (
+              <div className="italic">Waiting for logs...</div>
+            ) : data.logs.length === 0 ? (
+              <div className="italic">No logs recorded yet.</div>
+            ) : (
+              data.logs.map((log, i) => (
+                <div key={i}>{log}</div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
