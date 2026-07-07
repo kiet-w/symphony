@@ -110,6 +110,9 @@ export default function App() {
           />
         </div>
 
+        {/* Quick Setup Guide */}
+        <QuickSetupGuide />
+
         {/* My Issues Kanban Board */}
         <MyIssuesBoard />
 
@@ -292,6 +295,45 @@ function MyIssuesBoard() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function QuickSetupGuide() {
+  return (
+    <div className="mt-32">
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold tracking-tight">Quick Setup Guide</h2>
+        <p className="text-slate-400 text-sm">How to connect Symphony MCP to your autonomous agents.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-[#1E293B]/30 border border-slate-800 p-6 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-colors">
+          <div className="absolute top-0 left-0 w-1 h-full bg-[#22C55E]/50 group-hover:bg-[#22C55E] transition-colors" />
+          <div className="text-[#22C55E] font-mono text-sm mb-2">Step 1</div>
+          <h3 className="text-lg font-medium text-slate-200 mb-2">Copy Configuration</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Copy the <code>claude_desktop_config.json</code> block from the top of this page. It contains the path to your Symphony server and GitHub variables.
+          </p>
+        </div>
+        <div className="bg-[#1E293B]/30 border border-slate-800 p-6 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-colors">
+          <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 group-hover:bg-amber-500 transition-colors" />
+          <div className="text-amber-500 font-mono text-sm mb-2">Step 2</div>
+          <h3 className="text-lg font-medium text-slate-200 mb-2">Open Agent Config</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Open your Claude Desktop config folder. <br/>
+            <span className="text-xs font-mono text-slate-500 block mt-2">Mac: ~/Library/Application Support/Claude/</span>
+            <span className="text-xs font-mono text-slate-500 block mt-1">Win: %APPDATA%\\Claude\\</span>
+          </p>
+        </div>
+        <div className="bg-[#1E293B]/30 border border-slate-800 p-6 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-colors">
+          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50 group-hover:bg-indigo-500 transition-colors" />
+          <div className="text-indigo-400 font-mono text-sm mb-2">Step 3</div>
+          <h3 className="text-lg font-medium text-slate-200 mb-2">Paste & Restart</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Paste the JSON into <code>claude_desktop_config.json</code> and restart the application. Your agent now has atomic GitHub lock capabilities!
+          </p>
+        </div>
       </div>
     </div>
   );
