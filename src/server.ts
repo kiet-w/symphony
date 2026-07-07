@@ -175,41 +175,154 @@ async function main() {
   addLog("Symphony MCP Server (Bun + SQLite) running on stdio");
   
   // ponytail: Optional HTTP server for operator monitoring (status dashboard, live logs)
-  Bun.serve({
-    port: 4000,
-    async fetch(req) {
-      const url = new URL(req.url);
-      
-      // Handle CORS for frontend Vite app
-      if (req.method === "OPTIONS") {
-        return new Response(null, {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET",
+  if (process.env.ENABLE_HTTP_SERVER === "true") {
+    try {
+      Bun.serve({
+        port: 4000,
+        async fetch(req) {
+          const url = new URL(req.url);
+          
+          // Handle CORS
+          if (req.method === "OPTIONS") {
+            return new Response(null, {
+              headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+              }
+            });
           }
-        });
-      }
 
-      if (url.pathname === "/api/status") {
-        try {
-          const activeLocks = db.query("SELECT * FROM locks").all();
-          let board = null;
-          try {
-            board = await getBoard();
-          } catch (e) {
-            addLog(`Error fetching board: ${e}`);
+          const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json"
+          };
+
+          if (url.pathname === "/api/status") {
+            try {
+              const activeLocks = db.query("SELECT * FROM locks").all();
+              let board = null;
+              try {
+                board = await getBoard();
+              } catch (e) {
+                addLog(`Error fetching board: ${e}`);
+              }
+              return Response.json({ locks: activeLocks, logs: recentLogs, board }, {
+                headers: corsHeaders
+              });
+            } catch (e: any) {
+              return Response.json({ error: e.message }, { status: 500, headers: corsHeaders });
+            }
           }
-          return Response.json({ locks: activeLocks, logs: recentLogs, board }, {
-            headers: { "Access-Control-Allow-Origin": "*" }
-          });
-        } catch (e: any) {
-          return Response.json({ error: e.message }, { status: 500 });
+
+          if (url.pathname === "/api/claim" && req.method === "POST") {
+            try {
+              const body = await req.json();
+              const { ticketId, agentId } = body;
+              
+              const parsedTicketId = parseInt(ticketId, 10);
+              if (isNaN(parsedTicketId)) throw new Error(`Invalid ticketId: ${ticketId}`);
+              
+              try {
+                db.run(`INSERT INTO locks (ticket_id, agent_id) VALUES (?, ?)`, [ticketId, agentId]);
+              } catch (error: any) {
+                if (error.message.includes("UNIQUE constraint failed")) {
+                  const currentOwner = db.query(`SELECT agent_id FROM locks WHERE ticket_id = ?`).get(ticketId) as any;
+                  return Response.json({ 
+                    error: `Race Condition: Ticket ${ticketId} already claimed by ${currentOwner?.agent_id}` 
+                  }, { status: 409, headers: corsHeaders });
+                }
+                throw error;
+              }
+
+              try {
+                await claimTicket(parsedTicketId, agentId);
+              } catch (error) {
+                db.run(`DELETE FROM locks WHERE ticket_id = ?`, [ticketId]);
+                throw error;
+              }
+              
+              addLog(`🔒 Agent ${agentId} claimed ticket ${ticketId}`);
+              return Response.json({ 
+                success: true, 
+                message: `Lock acquired & claimed ticket ${ticketId} for agent ${agentId}` 
+              }, { headers: corsHeaders });
+            } catch (e: any) {
+              return Response.json({ error: e.message }, { status: 500, headers: corsHeaders });
+            }
+          }
+
+          if (url.pathname === "/api/status" && req.method === "POST") {
+            try {
+              const body = await req.json();
+              const { ticketId, status } = body;
+              
+              const parsedTicketId = parseInt(ticketId, 10);
+              if (isNaN(parsedTicketId)) throw new Error(`Invalid ticketId: ${ticketId}`);
+              
+              await setStatus(parsedTicketId, status);
+              addLog(`📊 Ticket ${ticketId} status set to ${status}`);
+              
+              return Response.json({ 
+                success: true, 
+                message: `Updated status of ticket ${ticketId} to ${status}` 
+              }, { headers: corsHeaders });
+            } catch (e: any) {
+              return Response.json({ error: e.message }, { status: 500, headers: corsHeaders });
+            }
+          }
+
+          if (url.pathname === "/api/signal" && req.method === "POST") {
+            try {
+              const body = await req.json();
+              const { ticketId, payload } = body;
+              
+              const parsedTicketId = parseInt(ticketId, 10);
+              if (isNaN(parsedTicketId)) throw new Error(`Invalid ticketId: ${ticketId}`);
+              
+              await postSignal(parsedTicketId, payload);
+              addLog(`📡 Signal posted to ticket ${ticketId}: ${payload}`);
+              
+              return Response.json({ 
+                success: true, 
+                message: `Posted signal to ticket ${ticketId}` 
+              }, { headers: corsHeaders });
+            } catch (e: any) {
+              return Response.json({ error: e.message }, { status: 500, headers: corsHeaders });
+            }
+          }
+
+
+          // Serve static Vite frontend
+          if (!url.pathname.startsWith("/api/")) {
+            let filePath = url.pathname;
+            if (filePath === "/") filePath = "/index.html";
+            
+            const path = require("path");
+            // import.meta.dir is src/, so we go up one level to symphony/
+            const projectRoot = path.resolve(import.meta.dir, "..");
+            const absolutePath = path.join(projectRoot, "frontend", "dist", filePath);
+            
+            const file = Bun.file(absolutePath);
+            if (await file.exists()) {
+              return new Response(file);
+            }
+            // Fallback for SPA routing
+            const indexHtml = Bun.file(path.join(projectRoot, "frontend", "dist", "index.html"));
+            if (await indexHtml.exists()) {
+              return new Response(indexHtml);
+            }
+          }
+
+          return new Response("Not found", { status: 404 });
         }
-      }
-      return new Response("Not found", { status: 404 });
+      });
+      addLog("HTTP Operator Dashboard API running on http://localhost:4000");
+      addLog("Dashboard UI available at http://localhost:4000/");
+    } catch (e: any) {
+      addLog(`HTTP server failed to start (port may be in use): ${e.message}`);
     }
-  });
-  addLog("HTTP Operator Dashboard API running on http://localhost:4000/api/status");
+  }
 }
 
 main().catch(console.error);

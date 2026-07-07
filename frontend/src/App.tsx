@@ -13,6 +13,7 @@ export default function App() {
       "command": "bun",
       "args": ["run", "/absolute/path/to/symphony/src/server.ts"],
       "env": {
+        "ENABLE_HTTP_SERVER": "true",
         "GITHUB_TOKEN": "ghp_your_personal_access_token_here",
         "GITHUB_OWNER": "kiet-w",
         "GITHUB_REPO": "symphony",
@@ -102,6 +103,7 @@ export default function App() {
       "command": "bun",
       "args": ["run", "src/server.ts"],
       "env": {
+        "ENABLE_HTTP_SERVER": "true",
         "GITHUB_TOKEN": "ghp_...",
         "GITHUB_OWNER": "kiet-w",
         "GITHUB_REPO": "symphony",
