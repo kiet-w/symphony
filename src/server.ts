@@ -5,6 +5,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { getBoard, claimTicket, setStatus, postSignal } from "./github.ts";
 
 // Initialize SQLite for Locks (Bun built-in)
 const db = new Database("symphony_locks.sqlite");
@@ -104,19 +105,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // 2. Here we would call Octokit/GraphQL to update assignee on GitHub
+        await claimTicket(parseInt(ticketId, 10), agentId);
+        
         console.error(`[Symphony] 🔒 Agent ${agentId} claimed ticket ${ticketId}`);
         return {
           content: [{ type: "text", text: `Lock acquired & successfully claimed ticket ${ticketId} for agent ${agentId}.` }]
         };
       }
 
-      // Other tools placeholders...
-      case "set_status":
-      case "post_signal":
-      case "get_board":
+      case "set_status": {
+        const { ticketId, status } = args as { ticketId: string; status: string };
+        await setStatus(parseInt(ticketId, 10), status);
         return {
-          content: [{ type: "text", text: `[Mock] ${name} executed successfully.` }]
+          content: [{ type: "text", text: `Successfully updated status of ticket ${ticketId} to ${status}.` }]
         };
+      }
+
+      case "post_signal": {
+        const { ticketId, payload } = args as { ticketId: string; payload: string };
+        await postSignal(parseInt(ticketId, 10), payload);
+        return {
+          content: [{ type: "text", text: `Successfully posted signal to ticket ${ticketId}.` }]
+        };
+      }
+
+      case "get_board": {
+        const boardData = await getBoard();
+        return {
+          content: [{ type: "text", text: JSON.stringify(boardData, null, 2) }]
+        };
+      }
 
       default:
         throw new Error(`Unknown tool: ${name}`);
