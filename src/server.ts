@@ -28,7 +28,6 @@ const server = new Server(
   }
 );
 
-// Tools Definition
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -80,7 +79,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-// Tool Handlers
+// ponytail: extract helper to shrink triplicated validation
+const parseTicketId = (id: string) => {
+  const parsed = parseInt(id, 10);
+  if (isNaN(parsed)) throw new Error(`Invalid ticketId: ${id}`);
+  return parsed;
+};
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
@@ -88,8 +93,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "claim_ticket": {
         const { ticketId, agentId } = args as { ticketId: string; agentId: string };
+        const parsedTicketId = parseTicketId(ticketId);
         
-        // 1. Check-then-set Atomic Lock using SQLite
         try {
           db.run(`INSERT INTO locks (ticket_id, agent_id) VALUES (?, ?)`, [ticketId, agentId]);
         } catch (error: any) {
@@ -104,8 +109,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw error;
         }
 
-        // 2. Here we would call Octokit/GraphQL to update assignee on GitHub
-        await claimTicket(parseInt(ticketId, 10), agentId);
+        try {
+          await claimTicket(parsedTicketId, agentId);
+        } catch (error) {
+          db.run(`DELETE FROM locks WHERE ticket_id = ?`, [ticketId]);
+          throw error;
+        }
         
         console.error(`[Symphony] 🔒 Agent ${agentId} claimed ticket ${ticketId}`);
         return {
@@ -115,7 +124,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "set_status": {
         const { ticketId, status } = args as { ticketId: string; status: string };
-        await setStatus(parseInt(ticketId, 10), status);
+        const parsedTicketId = parseTicketId(ticketId);
+        await setStatus(parsedTicketId, status);
         return {
           content: [{ type: "text", text: `Successfully updated status of ticket ${ticketId} to ${status}.` }]
         };
@@ -123,7 +133,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "post_signal": {
         const { ticketId, payload } = args as { ticketId: string; payload: string };
-        await postSignal(parseInt(ticketId, 10), payload);
+        const parsedTicketId = parseTicketId(ticketId);
+        await postSignal(parsedTicketId, payload);
         return {
           content: [{ type: "text", text: `Successfully posted signal to ticket ${ticketId}.` }]
         };

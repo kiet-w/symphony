@@ -4,7 +4,7 @@ import { graphql } from '@octokit/graphql';
 const token = process.env.GITHUB_TOKEN;
 
 if (!token) {
-  console.warn('GITHUB_TOKEN is not set in environment variables.');
+  throw new Error('GITHUB_TOKEN is not set in environment variables.');
 }
 
 const octokit = new Octokit({ auth: token });
@@ -22,9 +22,6 @@ function getRepoConfig() {
   return { owner, repo, projectNumber };
 }
 
-/**
- * Fetch issues from the repository's GitHub Project V2.
- */
 export async function getBoard() {
   const { owner, repo, projectNumber } = getRepoConfig();
   
@@ -33,12 +30,16 @@ export async function getBoard() {
   }
 
   const query = `
-    query($owner: String!, $repo: String!, $projectNumber: Int!) {
+    query($owner: String!, $repo: String!, $projectNumber: Int!, $cursor: String) {
       repository(owner: $owner, name: $repo) {
         projectV2(number: $projectNumber) {
           id
           title
-          items(first: 100) {
+          items(first: 100, after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             nodes {
               id
               fieldValues(first: 20) {
@@ -81,18 +82,46 @@ export async function getBoard() {
     }
   `;
 
-  const response = await graphqlWithAuth(query, {
-    owner,
-    repo,
-    projectNumber,
-  });
+  let hasNextPage = true;
+  let cursor: string | null = null;
+  const allNodes: any[] = [];
+  let projectTitle = '';
+  let projectId = '';
 
-  return response;
+  while (hasNextPage) {
+    const response: any = await graphqlWithAuth(query, {
+      owner,
+      repo,
+      projectNumber,
+      cursor,
+    });
+
+    const projectV2 = response.repository.projectV2;
+    if (!projectV2) {
+      throw new Error(`Project V2 with number ${projectNumber} not found.`);
+    }
+
+    projectId = projectV2.id;
+    projectTitle = projectV2.title;
+    allNodes.push(...projectV2.items.nodes);
+
+    hasNextPage = projectV2.items.pageInfo.hasNextPage;
+    cursor = projectV2.items.pageInfo.endCursor;
+  }
+
+  return {
+    repository: {
+      projectV2: {
+        id: projectId,
+        title: projectTitle,
+        items: {
+          nodes: allNodes
+        }
+      }
+    }
+  };
 }
 
-/**
- * Assign the issue to the given GitHub user/agent.
- */
 export async function claimTicket(issueNumber: number, assignee: string) {
   const { owner, repo } = getRepoConfig();
   
@@ -110,9 +139,6 @@ export async function claimTicket(issueNumber: number, assignee: string) {
   return response.data;
 }
 
-/**
- * Update the Project V2 item 'Status' field.
- */
 export async function setStatus(issueNumber: number, status: string) {
   const { owner, repo, projectNumber } = getRepoConfig();
 
@@ -151,7 +177,8 @@ export async function setStatus(issueNumber: number, status: string) {
     }
   `;
 
-  const info: any = await graphqlWithAuth(infoQuery, {
+  // ponytail: cast any instead of 26-line InfoQueryResponse interface
+  const info = await graphqlWithAuth<any>(infoQuery, {
     owner,
     repo,
     projectNumber,
@@ -228,19 +255,23 @@ export async function setStatus(issueNumber: number, status: string) {
     }
   `;
 
-  const response = await graphqlWithAuth(updateQuery, {
-    projectId,
-    itemId,
-    fieldId: statusFieldId,
-    optionId,
-  });
-
-  return response;
+  try {
+    const response = await graphqlWithAuth(updateQuery, {
+      projectId,
+      itemId,
+      fieldId: statusFieldId,
+      optionId,
+    });
+    return response;
+  } catch (error) {
+    if (!targetItem) {
+      // ponytail: yagni rollback mutation for a rare two-step failure. add when it actually bites.
+      throw new Error(`Failed to set status (issue added to project but status failed). Original error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    throw error;
+  }
 }
 
-/**
- * Add a comment to the issue with the compact signal payload.
- */
 export async function postSignal(issueNumber: number, payload: string) {
   const { owner, repo } = getRepoConfig();
   
