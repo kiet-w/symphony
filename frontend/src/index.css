@@ -1,0 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0F172A] text-[#F8FAFC] antialiased selection:bg-[#22C55E] selection:text-[#0F172A];
+  }
+}
