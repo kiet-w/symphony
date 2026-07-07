@@ -141,7 +141,7 @@ function FeatureCard({ icon, title, desc, delay }: { icon: React.ReactNode, titl
 }
 
 function OperatorDashboard() {
-  const [data, setData] = useState<{ locks: any[], logs: string[] } | null>(null);
+  const [data, setData] = useState<{ locks: any[], logs: string[], board: any } | null>(null);
 
   useEffect(() => {
     const fetchStatus = () => {
@@ -168,24 +168,37 @@ function OperatorDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Active Locks */}
+        {/* Active Locks / Connections */}
         <div className="p-6 rounded-xl bg-[#1E293B]/30 border border-slate-800">
           <h3 className="text-sm font-medium text-slate-300 mb-4 flex items-center gap-2">
             <LockKey className="w-4 h-4 text-[#22C55E]" />
-            Active SQLite Locks
+            Active MCP Connections
           </h3>
           <div className="space-y-3">
             {!data ? (
               <div className="text-slate-500 text-sm italic">Connecting to backend...</div>
             ) : data.locks.length === 0 ? (
-              <div className="text-slate-500 text-sm">No active locks.</div>
+              <div className="text-slate-500 text-sm">No active connections.</div>
             ) : (
-              data.locks.map((lock: any) => (
-                <div key={lock.ticket_id} className="flex justify-between items-center p-3 rounded bg-[#0F172A] border border-slate-800 text-sm">
-                  <span className="text-slate-300 font-mono">Ticket #{lock.ticket_id}</span>
-                  <span className="text-[#22C55E] px-2 py-0.5 rounded bg-[#22C55E]/10">Agent {lock.agent_id}</span>
-                </div>
-              ))
+              data.locks.map((lock: any) => {
+                const issues = data.board?.repository?.projectV2?.items?.nodes?.map((n: any) => n.content) || [];
+                const issue = issues.find((i: any) => i?.number === parseInt(lock.ticket_id));
+                const title = issue ? issue.title : "Unknown Task";
+                
+                return (
+                  <div key={lock.ticket_id} className="flex flex-col gap-2 p-3 rounded bg-[#0F172A] border border-slate-800 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#22C55E] px-2 py-0.5 rounded bg-[#22C55E]/10 font-mono text-xs">
+                        Agent {lock.agent_id}
+                      </span>
+                      <span className="text-slate-500 font-mono text-xs">Ticket #{lock.ticket_id}</span>
+                    </div>
+                    <div className="text-slate-300">
+                      <span className="text-slate-400">Executing task:</span> {title}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
