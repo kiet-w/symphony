@@ -24,7 +24,7 @@ const server = new Server(
     version: "1.0.0",
   },
   {
-    capabilities: { tools: {} },
+    capabilities: { tools: {}, logging: {} },
   }
 );
 
@@ -117,6 +117,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         console.error(`[Symphony] 🔒 Agent ${agentId} claimed ticket ${ticketId}`);
+        server.sendLoggingMessage({ level: "info", data: "Board updated" });
         return {
           content: [{ type: "text", text: `Lock acquired & successfully claimed ticket ${ticketId} for agent ${agentId}.` }]
         };
@@ -126,6 +127,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { ticketId, status } = args as { ticketId: string; status: string };
         const parsedTicketId = parseTicketId(ticketId);
         await setStatus(parsedTicketId, status);
+        server.sendLoggingMessage({ level: "info", data: "Board updated" });
         return {
           content: [{ type: "text", text: `Successfully updated status of ticket ${ticketId} to ${status}.` }]
         };
@@ -135,6 +137,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { ticketId, payload } = args as { ticketId: string; payload: string };
         const parsedTicketId = parseTicketId(ticketId);
         await postSignal(parsedTicketId, payload);
+        server.sendLoggingMessage({ level: "info", data: "Board updated" });
         return {
           content: [{ type: "text", text: `Successfully posted signal to ticket ${ticketId}.` }]
         };
